@@ -5,6 +5,7 @@ const dotenv = require("dotenv");
 const baseUrl = "https://tixcraft.com/activity/game/";
 
 dotenv.config();
+
 const sid = process.env.SID;
 const url = baseUrl + process.env.ACTIVITY_ID;
 const targetAreas = process.env.TARGET_AREAS.split(",");
@@ -53,12 +54,16 @@ async function setCookie(page) {
 
 async function acceptCookies(page) {
   if (!isUserDataDir) {
-    await page.waitForSelector("#onetrust-accept-btn-handler", {
-      timeout: 500,
-    });
-    const cookieButton = await page.$("#onetrust-accept-btn-handler");
-    if (cookieButton) {
-      await cookieButton.click();
+    try {
+      await page.waitForSelector("#onetrust-accept-btn-handler", {
+        timeout: 500,
+      });
+      const cookieButton = await page.$("#onetrust-accept-btn-handler");
+      if (cookieButton) {
+        await cookieButton.click();
+      }
+    } catch (error) {
+      console.log("Cookie acceptance button not found or timed out. Continuing...");
     }
   }
 }
@@ -74,10 +79,15 @@ async function clickPurchaseButton(page) {
 }
 
 async function selectTicketArea(page) {
-  await page.waitForSelector(".select_form_b", { timeout: 10000 });
+  const result = await Promise.race([
+    page.waitForSelector(".select_form_b", { timeout: 10000 }).then(() => "b"),
+    page.waitForSelector(".select_form_a", { timeout: 10000 }).then(() => "a")
+  ]);
+  
+  const selector = result === "b" ? "li.select_form_b a" : "li.select_form_a a";
+  
   for (const area of targetAreas) {
     console.log(`Searching for ${area}...`);
-    const selector = `li.select_form_b a`;
     const matchingLinks = await page.$$(selector);
     let found = false;
     for (let link of matchingLinks) {
